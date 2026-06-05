@@ -35,8 +35,7 @@ Return exactly this JSON structure:
     payload = {
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
         "generationConfig": {
-            "temperature": 0.0,
-            "responseMimeType": "application/json"
+            "temperature": 0.0
         }
     }
 
