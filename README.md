@@ -93,12 +93,18 @@ All metrics scored 0.0–1.0. **Gemini 1.5 Flash** is used as the judge — fast
 | **Chunking** | Sliding window with configurable size + overlap |
 | **Embeddings** | `all-MiniLM-L6-v2` via sentence-transformers (384-dim) |
 | **Vector Store** | ChromaDB (in-memory, cosine similarity, HNSW index) |
-| **Generation** | Google Gemini 1.5 Flash (streaming SSE) |
-| **Evaluation** | Gemini 1.5 Flash as RAGAS judge |
+| **Generation** | Google Gemini Flash (Direct HTTP stream) |
+| **Evaluation** | Gemini Flash (Direct HTTP) |
 | **Frontend** | Vanilla HTML/CSS/JS (no framework, fast load) |
 | **Deployment** | Docker → Render |
 
 ---
+
+## Technical Highlights
+- **Direct HTTP Integration**: Bypasses SDK overhead for maximum reliability on cloud platforms.
+- **Server-Side Security**: GEMINI_API_KEY managed via environment variables.
+- **Async Streaming**: Non-blocking SSE (Server-Sent Events) for real-time responsiveness.
+- **Evaluation Loop**: Integrated RAGAS-style scoring with Gemini as the judge.
 
 ## Running Locally
 
