@@ -31,12 +31,14 @@ Return exactly this JSON structure:
   "context_recall": {{"score": 0.0, "reason": "one sentence"}}
 }}"""
 
+    # Use 'gemini-1.5-flash-latest' for more robust resolution than the generic alias
     model = genai.GenerativeModel(
-        model_name="gemini-1.5-flash",
+        model_name="gemini-1.5-flash-latest",
         generation_config={"response_mime_type": "application/json"}
     )
 
-    response = model.generate_content(prompt)
+    # Use the asynchronous method to avoid blocking the FastAPI event loop
+    response = await model.generate_content_async(prompt)
     
     try:
         scores = json.loads(response.text)

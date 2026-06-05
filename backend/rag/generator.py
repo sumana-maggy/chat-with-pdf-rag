@@ -21,9 +21,9 @@ If the answer is not in the chunks, say so clearly.
 RETRIEVED CONTEXT:
 {context}"""
 
-    # Gemini 1.5 Flash is fast and has a large context window
+    # Use 'gemini-1.5-flash-latest' for more robust resolution than the generic alias
     model = genai.GenerativeModel(
-        model_name="gemini-1.5-flash",
+        model_name="gemini-1.5-flash-latest",
         system_instruction=system_instruction
     )
 
@@ -35,10 +35,9 @@ RETRIEVED CONTEXT:
 
     chat = model.start_chat(history=history)
     
-    # We use a synchronous generator wrapper since google-generativeai's stream is sync
-    # but we are in an async context. For FastAPI SSE, this works fine if we iterate.
-    response = chat.send_message(question, stream=True)
+    # Use the asynchronous streaming method to avoid blocking the FastAPI event loop
+    response = await chat.send_message_async(question, stream=True)
     
-    for chunk in response:
+    async for chunk in response:
         if chunk.text:
             yield chunk.text
