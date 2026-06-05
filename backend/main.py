@@ -16,6 +16,7 @@ from rag.ragas_eval import evaluate_ragas
 # ── In-memory session store: session_id → VectorStore ──
 sessions: dict[str, VectorStore] = {}
 embedder = None
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "YOUR_GEMINI_API_KEY")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -90,7 +91,6 @@ class QueryRequest(BaseModel):
     question: str
     top_k: int = 4
     min_score: float = 0.2
-    api_key: str
     chat_history: list = []
 
 @app.post("/query")
@@ -98,6 +98,9 @@ async def query(req: QueryRequest):
     vs = sessions.get(req.session_id)
     if not vs:
         raise HTTPException(404, "Session not found. Please re-upload your PDF.")
+
+    if GEMINI_API_KEY == "YOUR_GEMINI_API_KEY":
+        raise HTTPException(500, "Gemini API key not configured on server.")
 
     # Retrieve
     retrieved = retrieve_chunks(
@@ -121,7 +124,7 @@ async def query(req: QueryRequest):
             question=req.question,
             retrieved=retrieved,
             chat_history=req.chat_history,
-            api_key=req.api_key,
+            api_key=GEMINI_API_KEY,
         ):
             full_answer += token
             yield f"data: {json.dumps({'type': 'token', 'token': token})}\n\n"
@@ -135,7 +138,7 @@ async def query(req: QueryRequest):
                 question=req.question,
                 answer=full_answer,
                 retrieved=retrieved,
-                api_key=req.api_key,
+                api_key=GEMINI_API_KEY,
             )
             yield f"data: {json.dumps({'type': 'ragas_done', 'scores': ragas_scores})}\n\n"
         except Exception as e:

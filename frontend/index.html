@@ -226,15 +226,9 @@ canvas#spark{display:block;width:100%;height:60px;}
       <div class="cpanel" id="cpanel"><div class="echunk">Top-K chunks appear here after each query.</div></div>
     </div>
 
-    <div class="sbsec">
-      <div class="sectit">05 · Anthropic Key</div>
-      <div class="flbl">API Key</div>
-      <input type="password" class="finp" id="apiKey" placeholder="sk-ant-..." autocomplete="off">
-      <div class="fhint">Generation (claude-sonnet) + RAGAS eval (claude-haiku).</div>
     </div>
-  </div>
 
-  <!-- CHAT -->
+    <!-- CHAT -->
   <div class="chat">
     <div class="msgs" id="msgs">
       <div class="welcome" id="welcome">
@@ -254,10 +248,10 @@ canvas#spark{display:block;width:100%;height:60px;}
     <div class="errtost" id="errtost"></div>
     <div class="inpbar">
       <div class="inprow">
-        <textarea class="cinp" id="cinp" rows="1" placeholder="Upload PDF + add API key..." disabled></textarea>
+        <textarea class="cinp" id="cinp" rows="1" placeholder="Upload PDF to start..." disabled></textarea>
         <button class="sbtn" id="sbtn" disabled>➤</button>
       </div>
-      <div class="imeta"><span id="ragst">No session</span><span id="tokinfo">backend: FastAPI · embed: MiniLM · gen: claude-sonnet</span></div>
+      <div class="imeta"><span id="ragst">No session</span><span id="tokinfo">backend: FastAPI · embed: MiniLM · gen: gemini-1.5-flash</span></div>
     </div>
   </div>
 
@@ -377,7 +371,6 @@ async function send(){
         question: q,
         top_k: parseInt($('topK').value)||4,
         min_score: parseFloat($('minScore').value)||0.2,
-        api_key: $('apiKey').value.trim(),
         chat_history: chatHistory.slice(-6),
       })
     });
