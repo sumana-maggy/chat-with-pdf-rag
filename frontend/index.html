@@ -294,10 +294,12 @@ async function checkHealth(){
     const r = await fetch(`${API_BASE}/health`);
     if(r.ok){
       $('sdot').className='sdot ok';
+      if($('slbl')) $('slbl').textContent='Online';
       updateUI();
     }
   }catch(e){
     $('sdot').className='sdot err';
+    if($('slbl')) $('slbl').textContent='Offline';
     updateUI();
   }
 }

@@ -1,6 +1,5 @@
-import google.generativeai as genai
-from google.generativeai.types import HarmCategory, HarmBlockThreshold
 import json
+import httpx
 
 async def evaluate_ragas(
     question: str,
@@ -8,8 +7,8 @@ async def evaluate_ragas(
     retrieved: list[dict],
     api_key: str,
 ) -> dict:
-    # Use 'rest' transport for stability
-    genai.configure(api_key=api_key, transport='rest')
+    # Use v1 API directly
+    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={api_key}"
     
     context = "\n\n---\n\n".join(
         f"[Chunk {i+1} | Page {c['page']} | Similarity: {c['score']:.3f}]\n{c['text']}"
@@ -33,40 +32,38 @@ Return exactly this JSON structure:
   "context_recall": {{"score": 0.0, "reason": "one sentence"}}
 }}"""
 
-    model = genai.GenerativeModel(
-        model_name="gemini-1.5-flash",
-        generation_config={"response_mime_type": "application/json"}
-    )
-
-    safety = {
-        HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
-        HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
-        HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
-        HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+    payload = {
+        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "temperature": 0.0,
+            "response_mime_type": "application/json"
+        }
     }
 
-    try:
-        # Use asynchronous generation
-        response = await model.generate_content_async(
-            prompt,
-            safety_settings=safety
-        )
-        
-        scores = json.loads(response.text)
-        for metric in ["faithfulness", "answer_relevance", "context_precision", "context_recall"]:
-            if metric not in scores:
-                scores[metric] = {"score": 0.5, "reason": "Could not evaluate."}
-            scores[metric]["score"] = max(0.0, min(1.0, float(scores[metric]["score"])))
-        
-        overall = sum(scores[m]["score"] for m in ["faithfulness", "answer_relevance", "context_precision", "context_recall"]) / 4
-        scores["overall"] = round(overall, 4)
-        return scores
-    except Exception as e:
-        print(f"RAGAS evaluation error: {e}")
-        return {
-            "faithfulness": {"score": 0.5, "reason": "Parse error."},
-            "answer_relevance": {"score": 0.5, "reason": "Parse error."},
-            "context_precision": {"score": 0.5, "reason": "Parse error."},
-            "context_recall": {"score": 0.5, "reason": "Parse error."},
-            "overall": 0.5,
-        }
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.post(url, json=payload, timeout=30.0)
+            if response.status_code != 200:
+                raise Exception(f"API Error {response.status_code}: {response.text}")
+            
+            resp_json = response.json()
+            raw_text = resp_json["candidates"][0]["content"]["parts"][0]["text"]
+            
+            scores = json.loads(raw_text)
+            for metric in ["faithfulness", "answer_relevance", "context_precision", "context_recall"]:
+                if metric not in scores:
+                    scores[metric] = {"score": 0.5, "reason": "Could not evaluate."}
+                scores[metric]["score"] = max(0.0, min(1.0, float(scores[metric]["score"])))
+            
+            overall = sum(scores[m]["score"] for m in ["faithfulness", "answer_relevance", "context_precision", "context_recall"]) / 4
+            scores["overall"] = round(overall, 4)
+            return scores
+        except Exception as e:
+            print(f"RAGAS evaluation error: {e}")
+            return {
+                "faithfulness": {"score": 0.5, "reason": "API/Parse error."},
+                "answer_relevance": {"score": 0.5, "reason": "API/Parse error."},
+                "context_precision": {"score": 0.5, "reason": "API/Parse error."},
+                "context_recall": {"score": 0.5, "reason": "API/Parse error."},
+                "overall": 0.5,
+            }
