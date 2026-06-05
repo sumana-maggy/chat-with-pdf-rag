@@ -280,7 +280,7 @@ canvas#spark{display:block;width:100%;height:60px;}
 // In dev, it points to localhost
 const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
   ? 'http://localhost:8000'
-  : window.location.origin;  // same origin when served by FastAPI
+  : 'https://chat-with-pdf-rag-pnli.onrender.com';
 
 const $ = id => document.getElementById(id);
 const STEPS = ['parse','chunk','embed','store','retrieve','stream','ragas'];
@@ -618,7 +618,6 @@ $('upzone').addEventListener('dragover',e=>{e.preventDefault();$('upzone').class
 $('upzone').addEventListener('dragleave',()=>$('upzone').classList.remove('drag-over'));
 $('upzone').addEventListener('drop',e=>{e.preventDefault();$('upzone').classList.remove('drag-over');const f=e.dataTransfer.files[0];if(f?.type==='application/pdf')uploadPDF(f);});
 $('fileInput').addEventListener('change',e=>{const f=e.target.files[0];if(f)uploadPDF(f);});
-$('apiKey').addEventListener('input',updateUI);
 $('cinp').addEventListener('input',function(){this.style.height='auto';this.style.height=Math.min(this.scrollHeight,100)+'px';});
 $('cinp').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}});
 $('sbtn').addEventListener('click',send);
