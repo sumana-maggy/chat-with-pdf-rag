@@ -1,4 +1,5 @@
 import google.generativeai as genai
+from google.generativeai.types import HarmCategory, HarmBlockThreshold
 import json
 
 async def evaluate_ragas(
@@ -7,7 +8,7 @@ async def evaluate_ragas(
     retrieved: list[dict],
     api_key: str,
 ) -> dict:
-    # Use 'rest' transport to avoid gRPC issues on some platforms like Render
+    # Use 'rest' transport for stability
     genai.configure(api_key=api_key, transport='rest')
     
     context = "\n\n---\n\n".join(
@@ -32,16 +33,25 @@ Return exactly this JSON structure:
   "context_recall": {{"score": 0.0, "reason": "one sentence"}}
 }}"""
 
-    # 'gemini-1.5-flash' is the stable alias
     model = genai.GenerativeModel(
         model_name="gemini-1.5-flash",
         generation_config={"response_mime_type": "application/json"}
     )
 
-    # Use asynchronous generation
-    response = await model.generate_content_async(prompt)
-    
+    safety = {
+        HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+        HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+        HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+        HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+    }
+
     try:
+        # Use asynchronous generation
+        response = await model.generate_content_async(
+            prompt,
+            safety_settings=safety
+        )
+        
         scores = json.loads(response.text)
         for metric in ["faithfulness", "answer_relevance", "context_precision", "context_recall"]:
             if metric not in scores:
