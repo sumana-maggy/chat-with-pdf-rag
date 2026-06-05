@@ -64,7 +64,7 @@ Return exactly this JSON:
     client = anthropic.Anthropic(api_key=api_key)
 
     response = client.messages.create(
-        model="claude-haiku-4-5-20251001",  # use Haiku for eval — faster + cheaper
+        model="claude-3-haiku-20240307",  # use Haiku for eval — faster + cheaper
         max_tokens=512,
         system="You are a RAG evaluation expert. Return only valid JSON, no markdown, no explanation outside JSON.",
         messages=[{"role": "user", "content": prompt}],

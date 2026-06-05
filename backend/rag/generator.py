@@ -33,7 +33,7 @@ RETRIEVED CONTEXT:
     client = anthropic.Anthropic(api_key=api_key)
 
     with client.messages.stream(
-        model="claude-sonnet-4-20250514",
+        model="claude-3-5-sonnet-20241022",
         max_tokens=1024,
         system=system_prompt,
         messages=messages,
