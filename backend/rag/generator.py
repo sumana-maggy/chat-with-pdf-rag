@@ -9,7 +9,7 @@ async def stream_answer(
     api_key: str,
 ) -> AsyncGenerator[str, None]:
     # Use v1 API directly via HTTP to bypass SDK transport issues
-    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:streamGenerateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-001:streamGenerateContent?key={api_key}"
     
     context = "\n\n---\n\n".join(
         f"[Chunk {i+1} | Page {c['page']} | Similarity: {c['score']:.3f}]\n{c['text']}"
