@@ -2,24 +2,30 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system deps for PyMuPDF
+# Install system deps
 RUN apt-get update && apt-get install -y \
-    gcc g++ libffi-dev libssl-dev \
+    gcc g++ libffi-dev libssl-dev curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy and install Python deps
+# Install Python deps first (cached layer)
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Pre-download the embedding model so it's baked into the image
-RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')"
+# Pre-download MiniLM model during BUILD so it's baked in
+# This avoids downloading at runtime which causes 502 on free tier
+RUN python -c "
+from sentence_transformers import SentenceTransformer
+import os
+model = SentenceTransformer('all-MiniLM-L6-v2')
+print('Model downloaded successfully')
+"
 
-# Copy backend + frontend
+# Copy app code
 COPY backend/ ./backend/
 COPY frontend/ ./frontend/
 
 WORKDIR /app/backend
 
-EXPOSE 8000
+EXPOSE 10000
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "10000"]
