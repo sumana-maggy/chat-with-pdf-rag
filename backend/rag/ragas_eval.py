@@ -36,7 +36,7 @@ Return exactly this JSON structure:
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
         "generationConfig": {
             "temperature": 0.0,
-            "response_mime_type": "application/json"
+            "responseMimeType": "application/json"
         }
     }
 

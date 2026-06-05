@@ -33,7 +33,7 @@ RETRIEVED CONTEXT:
 
     payload = {
         "contents": contents,
-        "system_instruction": {"parts": [{"text": system_instruction}]},
+        "systemInstruction": {"parts": [{"text": system_instruction}]},
         "generationConfig": {
             "temperature": 0.2,
             "topP": 0.8,
