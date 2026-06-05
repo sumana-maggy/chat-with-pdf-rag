@@ -293,14 +293,12 @@ async function checkHealth(){
   try{
     const r = await fetch(`${API_BASE}/health`);
     if(r.ok){
-      const d = await r.json();
       $('sdot').className='sdot ok';
-      $('slbl').textContent=`Online · model: ${d.model}`;
       updateUI();
     }
   }catch(e){
     $('sdot').className='sdot err';
-    $('slbl').textContent='Backend offline';
+    updateUI();
   }
 }
 checkHealth();
@@ -481,14 +479,21 @@ function mgrade(s){
 }
 
 function updateUI(){
-  const ready = sessionId && $('apiKey').value.trim() && $('sdot').className.includes('ok');
-  $('cinp').disabled=!ready||isProc;
-  $('sbtn').disabled=!ready||isProc;
-  if($('sdot').className.includes('err')) $('cinp').placeholder='Backend offline — see README to run locally';
-  else if(!sessionId) $('cinp').placeholder='Upload a PDF first...';
-  else if(!$('apiKey').value.trim()) $('cinp').placeholder='Enter Anthropic API key...';
-  else if(isProc) $('cinp').placeholder='Processing...';
-  else $('cinp').placeholder='Ask anything about your PDF...';
+  const isOnline = $('sdot').className.includes('ok');
+  const ready = sessionId && isOnline;
+  
+  $('cinp').disabled = !ready || isProc;
+  $('sbtn').disabled = !ready || isProc;
+
+  if (!isOnline) {
+    $('cinp').placeholder = 'Backend offline — check server logs';
+  } else if (!sessionId) {
+    $('cinp').placeholder = 'Upload a PDF first...';
+  } else if (isProc) {
+    $('cinp').placeholder = 'Processing...';
+  } else {
+    $('cinp').placeholder = 'Ask anything about your PDF...';
+  }
 }
 
 function renderChunks(chunks){
