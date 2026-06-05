@@ -8,8 +8,8 @@ async def stream_answer(
     chat_history: list[dict],
     api_key: str,
 ) -> AsyncGenerator[str, None]:
-    # Use v1 API directly via HTTP to bypass SDK transport issues
-    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-001:streamGenerateContent?key={api_key}"
+    # Use v1beta and explicit alt=sse for better streaming compatibility
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:streamGenerateContent?alt=sse&key={api_key}"
     
     context = "\n\n---\n\n".join(
         f"[Chunk {i+1} | Page {c['page']} | Similarity: {c['score']:.3f}]\n{c['text']}"
@@ -23,7 +23,6 @@ If the answer is not in the chunks, say so clearly.
 RETRIEVED CONTEXT:
 {context}"""
 
-    # Build contents with role mapping
     contents = []
     for msg in chat_history[-6:]:
         role = "user" if msg["role"] == "user" else "model"
@@ -51,15 +50,15 @@ RETRIEVED CONTEXT:
                 
                 async for line in response.aiter_lines():
                     if not line: continue
-                    # Gemini stream returns a JSON array of objects. We parse them individually.
-                    clean = line.strip().lstrip("[").rstrip(",").rstrip("]")
-                    if not clean: continue
-                    try:
-                        chunk = json.loads(clean)
-                        if "candidates" in chunk:
-                            text = chunk["candidates"][0]["content"]["parts"][0]["text"]
-                            yield text
-                    except:
-                        continue
+                    if line.startswith("data: "):
+                        raw_json = line[6:].strip()
+                        try:
+                            chunk = json.loads(raw_json)
+                            if "candidates" in chunk:
+                                parts = chunk["candidates"][0].get("content", {}).get("parts", [])
+                                if parts:
+                                    yield parts[0]["text"]
+                        except:
+                            continue
         except Exception as e:
             yield f"⚠️ Connection Error: {str(e)}"

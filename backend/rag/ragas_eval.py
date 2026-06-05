@@ -7,8 +7,8 @@ async def evaluate_ragas(
     retrieved: list[dict],
     api_key: str,
 ) -> dict:
-    # Use v1 API directly
-    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-001:generateContent?key={api_key}"
+    # Use v1beta for RAGAS evaluation as well
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
     
     context = "\n\n---\n\n".join(
         f"[Chunk {i+1} | Page {c['page']} | Similarity: {c['score']:.3f}]\n{c['text']}"
@@ -47,6 +47,9 @@ Return exactly this JSON structure:
             
             resp_json = response.json()
             raw_text = resp_json["candidates"][0]["content"]["parts"][0]["text"]
+            
+            # Clean possible markdown
+            raw_text = raw_text.replace("```json", "").replace("```", "").strip()
             
             scores = json.loads(raw_text)
             for metric in ["faithfulness", "answer_relevance", "context_precision", "context_recall"]:
