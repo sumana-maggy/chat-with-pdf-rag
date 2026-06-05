@@ -51,7 +51,7 @@ async def root():
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "model": "all-MiniLM-L6-v2", "sessions": len(sessions)}
+    return {"status": "ok", "model": "Hash-384", "sessions": len(sessions)}
 
 # ── UPLOAD PDF ──
 @app.post("/upload")

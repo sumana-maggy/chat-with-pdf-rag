@@ -242,7 +242,7 @@ canvas#spark{display:block;width:100%;height:60px;}
           <div class="rb hl"><span class="ri">📊</span>RAGAS<br>Eval</div>
         </div>
         <h2>Production RAG + RAGAS</h2>
-        <p>FastAPI backend · ChromaDB vector store · MiniLM-L6-v2 embeddings · Claude streaming · 4-metric RAGAS evaluation</p>
+        <p>FastAPI backend · ChromaDB vector store · Lightweight Hash embeddings · Gemini streaming · 4-metric RAGAS evaluation</p>
       </div>
     </div>
     <div class="errtost" id="errtost"></div>
@@ -251,7 +251,7 @@ canvas#spark{display:block;width:100%;height:60px;}
         <textarea class="cinp" id="cinp" rows="1" placeholder="Upload PDF to start..." disabled></textarea>
         <button class="sbtn" id="sbtn" disabled>➤</button>
       </div>
-      <div class="imeta"><span id="ragst">No session</span><span id="tokinfo">backend: FastAPI · embed: MiniLM · gen: gemini-1.5-flash</span></div>
+      <div class="imeta"><span id="ragst">No session</span><span id="tokinfo">backend: FastAPI · embed: Hash-384 · gen: gemini-1.5-flash</span></div>
     </div>
   </div>
 
@@ -337,7 +337,7 @@ async function uploadPDF(file){
     ['parse','chunk','embed','store'].forEach(k=>doneStep(k));
     $('ragst').textContent=`${d.chunks} chunks · ${d.pages} pages · session ready`;
 
-    addSysMsg(`✅ **${file.name}** indexed!\n\n**${d.chunks} chunks** embedded with \`all-MiniLM-L6-v2\` (384-dim) and stored in **ChromaDB**.\n\nAsk me anything — cosine similarity retrieval → streaming Claude answer → RAGAS evaluation.`);
+    addSysMsg(`✅ **${file.name}** indexed!\n\n**${d.chunks} chunks** embedded with \`Hash-384\` (deterministic) and stored in **ChromaDB**.\n\nAsk me anything — cosine similarity retrieval → streaming Gemini answer → RAGAS evaluation.`);
     setTimeout(()=>showP(false), 2000);
 
   }catch(e){
