@@ -1,15 +1,9 @@
 import chromadb
 from chromadb.config import Settings
-from sentence_transformers import SentenceTransformer
 from rag.embedder import embed_texts
 
 class VectorStore:
-    """
-    Per-session ChromaDB collection.
-    Uses in-memory Chroma so no disk setup needed on Render.
-    """
-
-    def __init__(self, session_id: str, embedder: SentenceTransformer):
+    def __init__(self, session_id: str, embedder):
         self.session_id = session_id
         self.embedder = embedder
         self.client = chromadb.Client(Settings(anonymized_telemetry=False))
@@ -19,10 +13,8 @@ class VectorStore:
         )
 
     def add_chunks(self, chunks: list[dict]):
-        """Embed and store chunks in ChromaDB."""
         texts = [c["text"] for c in chunks]
         embeddings = embed_texts(self.embedder, texts)
-
         self.collection.add(
             ids=[str(c["chunkId"]) for c in chunks],
             embeddings=embeddings,
@@ -31,17 +23,14 @@ class VectorStore:
         )
 
     def query(self, query_embedding: list[float], top_k: int) -> list[dict]:
-        """Return top_k most similar chunks with scores."""
         results = self.collection.query(
             query_embeddings=[query_embedding],
             n_results=min(top_k, self.collection.count()),
             include=["documents", "metadatas", "distances"],
         )
-
         chunks = []
         for i, doc in enumerate(results["documents"][0]):
             distance = results["distances"][0][i]
-            # ChromaDB cosine distance → similarity: score = 1 - distance
             score = round(1.0 - distance, 4)
             meta = results["metadatas"][0][i]
             chunks.append({
