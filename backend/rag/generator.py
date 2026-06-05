@@ -9,7 +9,7 @@ async def stream_answer(
     api_key: str,
 ) -> AsyncGenerator[str, None]:
     # Use v1beta and explicit alt=sse for better streaming compatibility
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:streamGenerateContent?alt=sse&key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:streamGenerateContent?alt=sse&key={api_key}"
     
     context = "\n\n---\n\n".join(
         f"[Chunk {i+1} | Page {c['page']} | Similarity: {c['score']:.3f}]\n{c['text']}"
