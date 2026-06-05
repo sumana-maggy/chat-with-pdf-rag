@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: chat-with-pdf-rag
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
+    healthCheckPath: /health
+    autoDeploy: true

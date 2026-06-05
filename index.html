@@ -1,0 +1,1202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RAG Chat with PDF — Sumana Yerremsetti</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+  :root {
+    --bg: #080b10;
+    --surface: #0f1319;
+    --surface2: #171d26;
+    --surface3: #1e2535;
+    --border: rgba(99,179,237,0.1);
+    --accent: #3b82f6;
+    --accent2: #06b6d4;
+    --accent3: #8b5cf6;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --text: #e2e8f0;
+    --text-soft: rgba(226,232,240,0.6);
+    --text-muted: rgba(226,232,240,0.3);
+    --radius: 12px;
+    --glow: 0 0 20px rgba(59,130,246,0.15);
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 300;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── TOPBAR ── */
+  .topbar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    gap: 16px;
+  }
+
+  .logo {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 1.1rem;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    white-space: nowrap;
+  }
+
+  .pipeline-display {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .pipe-step {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.68rem;
+    font-family: 'DM Mono', monospace;
+    color: var(--text-muted);
+    transition: color 0.3s;
+  }
+
+  .pipe-step.active { color: var(--accent2); }
+  .pipe-step.done { color: var(--success); }
+
+  .pipe-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    transition: all 0.3s;
+  }
+
+  .pipe-step.active .pipe-dot {
+    animation: pulseDot 1s ease-in-out infinite;
+    box-shadow: 0 0 6px currentColor;
+  }
+
+  @keyframes pulseDot { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  .pipe-arrow { color: var(--text-muted); font-size: 0.6rem; }
+
+  .author-tag {
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    font-family: 'DM Mono', monospace;
+    white-space: nowrap;
+  }
+
+  /* ── LAYOUT ── */
+  .main { display:flex; flex:1; overflow:hidden; }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    width: 300px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    overflow-y: auto;
+  }
+
+  .sidebar::-webkit-scrollbar { width: 3px; }
+  .sidebar::-webkit-scrollbar-thumb { background: var(--border); }
+
+  .sidebar-section {
+    padding: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sidebar-section:last-child { border-bottom: none; }
+
+  .sec-title {
+    font-size: 0.62rem;
+    font-weight: 600;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .sec-title::after {
+    content:'';
+    flex:1; height:1px;
+    background: var(--border);
+  }
+
+  /* Upload */
+  .upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 24px 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.25s;
+    position: relative;
+    background: var(--surface2);
+  }
+
+  .upload-zone:hover, .upload-zone.drag-over {
+    border-color: var(--accent);
+    background: rgba(59,130,246,0.05);
+    box-shadow: var(--glow);
+  }
+
+  .upload-zone input[type="file"] {
+    position: absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%;
+  }
+
+  .upload-icon { font-size: 2rem; margin-bottom: 8px; }
+  .upload-label { font-size: 0.8rem; color: var(--text-soft); line-height:1.5; }
+  .upload-label strong { color: var(--accent); font-weight:500; }
+
+  /* API Key */
+  .field-label {
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .field-input {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 9px 12px;
+    color: var(--text);
+    font-size: 0.78rem;
+    font-family: 'DM Mono', monospace;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .field-input:focus { border-color: var(--accent); }
+  .field-input::placeholder { color: var(--text-muted); }
+
+  .field-hint { font-size: 0.66rem; color: var(--text-muted); margin-top: 5px; line-height:1.5; }
+
+  /* RAG Config */
+  .config-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .config-item label {
+    display: block;
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+    letter-spacing: 0.5px;
+  }
+
+  .config-item input[type="number"] {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 7px 10px;
+    color: var(--accent2);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.8rem;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .config-item input:focus { border-color: var(--accent2); }
+
+  /* Pipeline Stats */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .stat-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    text-align: center;
+  }
+
+  .stat-val {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--accent2);
+    line-height: 1;
+  }
+
+  .stat-label {
+    font-size: 0.62rem;
+    color: var(--text-muted);
+    margin-top: 4px;
+    letter-spacing: 0.5px;
+  }
+
+  /* Progress bar */
+  .progress-wrap {
+    margin-top: 12px;
+    display: none;
+  }
+  .progress-wrap.show { display: block; }
+
+  .progress-label {
+    font-size: 0.7rem;
+    color: var(--text-soft);
+    margin-bottom: 6px;
+    font-family: 'DM Mono', monospace;
+  }
+
+  .progress-bar-bg {
+    height: 4px;
+    background: var(--surface3);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent) 0%, var(--accent2) 100%);
+    border-radius: 2px;
+    transition: width 0.3s ease;
+    width: 0%;
+  }
+
+  /* Retrieved chunks panel */
+  .chunks-panel {
+    max-height: 160px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .chunks-panel::-webkit-scrollbar { width: 3px; }
+  .chunks-panel::-webkit-scrollbar-thumb { background: var(--border); }
+
+  .chunk-item {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent3);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 0.72rem;
+    color: var(--text-soft);
+    line-height: 1.5;
+  }
+
+  .chunk-meta {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.62rem;
+    color: var(--accent3);
+    margin-bottom: 3px;
+  }
+
+  .chunk-preview {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .empty-chunks {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-align: center;
+    padding: 16px;
+    font-style: italic;
+  }
+
+  /* ── CHAT AREA ── */
+  .chat-area {
+    flex:1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .messages {
+    flex:1;
+    overflow-y: auto;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    scroll-behavior: smooth;
+  }
+
+  .messages::-webkit-scrollbar { width: 4px; }
+  .messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* Welcome */
+  .welcome {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    min-height: 400px;
+    text-align: center;
+    padding: 40px;
+  }
+
+  .rag-diagram {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .rag-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 0.72rem;
+    font-family: 'DM Mono', monospace;
+    color: var(--text-soft);
+    text-align: center;
+    line-height: 1.4;
+  }
+
+  .rag-box .icon { font-size: 1.2rem; display: block; margin-bottom: 4px; }
+  .rag-box.highlight { border-color: var(--accent); color: var(--accent2); box-shadow: var(--glow); }
+
+  .rag-arrow { color: var(--text-muted); font-size: 1rem; }
+
+  .welcome h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 10px;
+  }
+
+  .welcome p { font-size: 0.87rem; color: var(--text-soft); max-width: 420px; line-height:1.7; }
+
+  /* Messages */
+  .msg {
+    display: flex;
+    gap: 12px;
+    animation: msgIn 0.3s ease both;
+  }
+  @keyframes msgIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+
+  .msg.user { flex-direction: row-reverse; }
+
+  .avatar {
+    width: 34px; height: 34px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.72rem;
+    font-weight: 700;
+    flex-shrink: 0;
+    font-family: 'DM Mono', monospace;
+  }
+
+  .avatar.ai { background: linear-gradient(135deg, var(--accent) 0%, var(--accent3) 100%); color: #fff; }
+  .avatar.user { background: var(--surface3); color: var(--accent2); border: 1px solid var(--border); }
+
+  .msg-content { max-width: 75%; display: flex; flex-direction: column; gap: 6px; }
+  .msg.user .msg-content { align-items: flex-end; }
+
+  .bubble {
+    padding: 13px 16px;
+    border-radius: var(--radius);
+    font-size: 0.875rem;
+    line-height: 1.75;
+  }
+
+  .msg.ai .bubble {
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 4px var(--radius) var(--radius) var(--radius);
+  }
+
+  .msg.user .bubble {
+    background: rgba(59,130,246,0.12);
+    color: var(--text);
+    border: 1px solid rgba(59,130,246,0.2);
+    border-radius: var(--radius) 4px var(--radius) var(--radius);
+  }
+
+  .bubble strong { color: var(--accent2); font-weight: 500; }
+  .bubble code {
+    background: rgba(255,255,255,0.06);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.82em;
+    color: var(--accent2);
+  }
+
+  /* Retrieved context badge */
+  .context-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.68rem;
+    font-family: 'DM Mono', monospace;
+    color: var(--accent3);
+    padding: 4px 10px;
+    background: rgba(139,92,246,0.08);
+    border: 1px solid rgba(139,92,246,0.2);
+    border-radius: 20px;
+    width: fit-content;
+  }
+
+  /* Typing */
+  .typing-dots { display:flex; gap:4px; padding:4px 0; align-items:center; }
+  .typing-dots span {
+    width:6px; height:6px; border-radius:50%;
+    background: var(--accent);
+    animation: dotBounce 1.2s ease-in-out infinite;
+  }
+  .typing-dots span:nth-child(2) { animation-delay:.2s; background: var(--accent2); }
+  .typing-dots span:nth-child(3) { animation-delay:.4s; background: var(--accent3); }
+  @keyframes dotBounce { 0%,80%,100%{transform:translateY(0);opacity:.4} 40%{transform:translateY(-5px);opacity:1} }
+
+  /* ── INPUT BAR ── */
+  .input-bar {
+    padding: 16px 24px;
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+    flex-shrink: 0;
+  }
+
+  .input-row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+  }
+
+  .chat-input {
+    flex:1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    color: var(--text);
+    font-size: 0.9rem;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 300;
+    resize: none;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    max-height: 120px;
+    min-height: 46px;
+  }
+  .chat-input:focus { border-color: var(--accent); box-shadow: var(--glow); }
+  .chat-input::placeholder { color: var(--text-muted); }
+  .chat-input:disabled { opacity: 0.4; }
+
+  .send-btn {
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent3) 100%);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius);
+    width: 46px; height: 46px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: all 0.2s;
+    flex-shrink: 0;
+  }
+  .send-btn:hover:not(:disabled) { transform: scale(1.06); box-shadow: 0 0 16px rgba(59,130,246,0.4); }
+  .send-btn:disabled { opacity:0.3; cursor:not-allowed; transform:none; }
+
+  .input-meta {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 8px;
+    font-size: 0.66rem;
+    color: var(--text-muted);
+    font-family: 'DM Mono', monospace;
+  }
+
+  .error-toast {
+    background: rgba(239,68,68,0.1);
+    border: 1px solid rgba(239,68,68,0.3);
+    color: #fca5a5;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 0.78rem;
+    margin-bottom: 10px;
+    display: none;
+  }
+  .error-toast.show { display: block; }
+
+  @media (max-width:700px) {
+    .sidebar { width:100%; max-height:240px; flex-direction:row; flex-wrap:wrap; }
+    .pipeline-display { display:none; }
+    .bubble { font-size:0.82rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">RAG·PDF ✦</div>
+  <div class="pipeline-display">
+    <div class="pipe-step" id="step-chunk"><div class="pipe-dot"></div>Chunking</div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-step" id="step-embed"><div class="pipe-dot"></div>Embedding</div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-step" id="step-store"><div class="pipe-dot"></div>VectorStore</div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-step" id="step-retrieve"><div class="pipe-dot"></div>Retrieval</div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-step" id="step-generate"><div class="pipe-dot"></div>Generation</div>
+  </div>
+  <div class="author-tag">by sumana-maggy</div>
+</div>
+
+<div class="main">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+
+    <!-- Upload -->
+    <div class="sidebar-section">
+      <div class="sec-title">01 · Upload PDF</div>
+      <div class="upload-zone" id="uploadZone">
+        <input type="file" id="fileInput" accept=".pdf">
+        <div class="upload-icon">📄</div>
+        <div class="upload-label"><strong>Click or drag</strong> a PDF here</div>
+      </div>
+      <div class="progress-wrap" id="progressWrap">
+        <div class="progress-label" id="progressLabel">Extracting text...</div>
+        <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressFill"></div></div>
+      </div>
+    </div>
+
+    <!-- RAG Config -->
+    <div class="sidebar-section">
+      <div class="sec-title">02 · RAG Config</div>
+      <div class="config-grid">
+        <div class="config-item">
+          <label>Chunk Size (chars)</label>
+          <input type="number" id="chunkSize" value="500" min="100" max="2000" step="50">
+        </div>
+        <div class="config-item">
+          <label>Chunk Overlap</label>
+          <input type="number" id="chunkOverlap" value="50" min="0" max="500" step="10">
+        </div>
+        <div class="config-item">
+          <label>Top-K Chunks</label>
+          <input type="number" id="topK" value="4" min="1" max="10">
+        </div>
+        <div class="config-item">
+          <label>Min Score</label>
+          <input type="number" id="minScore" value="0.1" min="0" max="1" step="0.05">
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="sidebar-section">
+      <div class="sec-title">03 · Index Stats</div>
+      <div class="stats-grid">
+        <div class="stat-box">
+          <div class="stat-val" id="statChunks">0</div>
+          <div class="stat-label">Chunks</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-val" id="statEmbeds">0</div>
+          <div class="stat-label">Embeddings</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-val" id="statPages">0</div>
+          <div class="stat-label">Pages</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-val" id="statDim">0</div>
+          <div class="stat-label">Dimensions</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Retrieved Chunks -->
+    <div class="sidebar-section">
+      <div class="sec-title">04 · Retrieved Context</div>
+      <div class="chunks-panel" id="chunksPanel">
+        <div class="empty-chunks">Context chunks will appear here after you ask a question.</div>
+      </div>
+    </div>
+
+    <!-- API Key -->
+    <div class="sidebar-section">
+      <div class="sec-title">05 · API Key</div>
+      <div class="field-label">Anthropic API Key</div>
+      <input type="password" class="field-input" id="apiKey" placeholder="sk-ant-..." autocomplete="off">
+      <div class="field-hint">Used only for embeddings (text-embedding-3-small via OpenAI) and Claude generation. Never stored.</div>
+      <div style="margin-top:10px">
+      <div class="field-label">OpenAI Key (for embeddings)</div>
+      <input type="password" class="field-input" id="openaiKey" placeholder="sk-..." autocomplete="off" style="margin-top:4px">
+      <div class="field-hint">OpenAI text-embedding-3-small is used to generate vectors. Claude handles Q&A.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- CHAT -->
+  <div class="chat-area">
+    <div class="messages" id="messages">
+      <div class="welcome" id="welcome">
+        <div class="rag-diagram">
+          <div class="rag-box"><span class="icon">📄</span>PDF</div>
+          <div class="rag-arrow">→</div>
+          <div class="rag-box"><span class="icon">✂️</span>Chunks</div>
+          <div class="rag-arrow">→</div>
+          <div class="rag-box highlight"><span class="icon">🔢</span>Embeddings</div>
+          <div class="rag-arrow">→</div>
+          <div class="rag-box"><span class="icon">🗄️</span>VectorDB</div>
+          <div class="rag-arrow">→</div>
+          <div class="rag-box highlight"><span class="icon">🔍</span>Retrieval</div>
+          <div class="rag-arrow">→</div>
+          <div class="rag-box"><span class="icon">🤖</span>Claude</div>
+        </div>
+        <h2>RAG-Powered PDF Chat</h2>
+        <p>This is a proper Retrieval-Augmented Generation pipeline. Your PDF is chunked, embedded into vectors, and stored in-memory. Each question retrieves the most semantically relevant chunks — Claude only sees what matters.</p>
+      </div>
+    </div>
+
+    <div class="error-toast" id="errorToast"></div>
+
+    <div class="input-bar">
+      <div class="input-row">
+        <textarea class="chat-input" id="chatInput" rows="1" placeholder="Upload a PDF and add your API keys to start..." disabled></textarea>
+        <button class="send-btn" id="sendBtn" disabled>➤</button>
+      </div>
+      <div class="input-meta">
+        <span id="ragStatus">No index loaded</span>
+        <span id="tokenInfo">—</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+// ════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════
+let vectorStore = [];   // [{text, embedding, page, chunkId, score?}]
+let chatHistory = [];
+let isProcessing = false;
+let totalPages = 0;
+
+const EMBEDDING_DIM = 1536; // text-embedding-3-small
+
+// ════════════════════════════════════════════
+// DOM REFS
+// ════════════════════════════════════════════
+const fileInput     = document.getElementById('fileInput');
+const uploadZone    = document.getElementById('uploadZone');
+const chatInput     = document.getElementById('chatInput');
+const sendBtn       = document.getElementById('sendBtn');
+const messagesEl    = document.getElementById('messages');
+const apiKey        = document.getElementById('apiKey');
+const openaiKey     = document.getElementById('openaiKey');
+const progressWrap  = document.getElementById('progressWrap');
+const progressFill  = document.getElementById('progressFill');
+const progressLabel = document.getElementById('progressLabel');
+const chunksPanel   = document.getElementById('chunksPanel');
+const ragStatus     = document.getElementById('ragStatus');
+const tokenInfo     = document.getElementById('tokenInfo');
+
+// Pipeline steps
+const pipeSteps = {
+  chunk:    document.getElementById('step-chunk'),
+  embed:    document.getElementById('step-embed'),
+  store:    document.getElementById('step-store'),
+  retrieve: document.getElementById('step-retrieve'),
+  generate: document.getElementById('step-generate'),
+};
+
+// Stats
+const statChunks = document.getElementById('statChunks');
+const statEmbeds = document.getElementById('statEmbeds');
+const statPages  = document.getElementById('statPages');
+const statDim    = document.getElementById('statDim');
+
+// ════════════════════════════════════════════
+// STEP 1 — PDF PARSING
+// ════════════════════════════════════════════
+async function parsePDF(file) {
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  totalPages = pdf.numPages;
+
+  let pages = [];
+  for (let i = 1; i <= totalPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    const text = content.items.map(item => item.str).join(' ').replace(/\s+/g, ' ').trim();
+    pages.push({ pageNum: i, text });
+    setProgress(Math.round((i / totalPages) * 30), `Parsing page ${i}/${totalPages}...`);
+  }
+  return pages;
+}
+
+// ════════════════════════════════════════════
+// STEP 2 — CHUNKING (sliding window)
+// ════════════════════════════════════════════
+function chunkPages(pages) {
+  const chunkSize    = parseInt(document.getElementById('chunkSize').value) || 500;
+  const chunkOverlap = parseInt(document.getElementById('chunkOverlap').value) || 50;
+  const chunks = [];
+  let chunkId = 0;
+
+  for (const { pageNum, text } of pages) {
+    if (!text.trim()) continue;
+    let start = 0;
+    while (start < text.length) {
+      const end = Math.min(start + chunkSize, text.length);
+      const chunkText = text.slice(start, end).trim();
+      if (chunkText.length > 30) {
+        chunks.push({ chunkId: chunkId++, text: chunkText, page: pageNum });
+      }
+      if (end === text.length) break;
+      start += chunkSize - chunkOverlap;
+    }
+  }
+  return chunks;
+}
+
+// ════════════════════════════════════════════
+// STEP 3 — EMBEDDINGS (OpenAI text-embedding-3-small)
+// ════════════════════════════════════════════
+async function embedTexts(texts, batchSize = 20) {
+  const key = openaiKey.value.trim();
+  if (!key) throw new Error('OpenAI API key required for embeddings');
+
+  const embeddings = [];
+  for (let i = 0; i < texts.length; i += batchSize) {
+    const batch = texts.slice(i, i + batchSize);
+    const resp = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${key}`
+      },
+      body: JSON.stringify({ model: 'text-embedding-3-small', input: batch })
+    });
+    if (!resp.ok) {
+      const err = await resp.json();
+      throw new Error('OpenAI Embedding error: ' + (err.error?.message || resp.status));
+    }
+    const data = await resp.json();
+    embeddings.push(...data.data.map(d => d.embedding));
+
+    const pct = 30 + Math.round(((i + batch.length) / texts.length) * 60);
+    setProgress(pct, `Embedding batch ${Math.ceil((i+1)/batchSize)}/${Math.ceil(texts.length/batchSize)}...`);
+  }
+  return embeddings;
+}
+
+// ════════════════════════════════════════════
+// STEP 4 — IN-MEMORY VECTOR STORE
+// ════════════════════════════════════════════
+function buildVectorStore(chunks, embeddings) {
+  vectorStore = chunks.map((chunk, i) => ({
+    ...chunk,
+    embedding: embeddings[i]
+  }));
+}
+
+// ════════════════════════════════════════════
+// STEP 5 — COSINE SIMILARITY RETRIEVAL
+// ════════════════════════════════════════════
+function cosineSimilarity(a, b) {
+  let dot = 0, normA = 0, normB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot   += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
+  }
+  return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+}
+
+async function retrieveChunks(query) {
+  const key = openaiKey.value.trim();
+  if (!key) throw new Error('OpenAI API key required');
+
+  // Embed the query
+  const resp = await fetch('https://api.openai.com/v1/embeddings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+    body: JSON.stringify({ model: 'text-embedding-3-small', input: [query] })
+  });
+  if (!resp.ok) throw new Error('Query embedding failed');
+  const data = await resp.json();
+  const queryVec = data.data[0].embedding;
+
+  const topK    = parseInt(document.getElementById('topK').value) || 4;
+  const minScore = parseFloat(document.getElementById('minScore').value) || 0.1;
+
+  // Score all chunks
+  const scored = vectorStore.map(item => ({
+    ...item,
+    score: cosineSimilarity(queryVec, item.embedding)
+  }));
+
+  // Sort by score descending, take top-K above threshold
+  return scored
+    .filter(c => c.score >= minScore)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, topK);
+}
+
+// ════════════════════════════════════════════
+// STEP 6 — GENERATION (Claude)
+// ════════════════════════════════════════════
+async function generateAnswer(query, retrievedChunks) {
+  const key = apiKey.value.trim();
+  if (!key) throw new Error('Anthropic API key required');
+
+  const context = retrievedChunks
+    .map((c, i) => `[Chunk ${i+1} | Page ${c.page} | Score: ${c.score.toFixed(3)}]\n${c.text}`)
+    .join('\n\n---\n\n');
+
+  const systemPrompt = `You are an expert document analyst using Retrieval-Augmented Generation (RAG).
+
+You have been given the top-${retrievedChunks.length} most semantically relevant chunks from a PDF document, retrieved by comparing the user's question embedding against document chunk embeddings using cosine similarity.
+
+Answer the user's question based ONLY on the provided context chunks. If the answer cannot be found in the chunks, say so clearly. Cite page numbers when relevant.
+
+RETRIEVED CONTEXT:
+${context}`;
+
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': key,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 1024,
+      system: systemPrompt,
+      messages: [
+        ...chatHistory.slice(-6),
+        { role: 'user', content: query }
+      ]
+    })
+  });
+
+  if (!resp.ok) {
+    const err = await resp.json();
+    throw new Error('Claude error: ' + (err.error?.message || resp.status));
+  }
+
+  const data = await resp.json();
+  return data.content?.[0]?.text || 'No response.';
+}
+
+// ════════════════════════════════════════════
+// FULL INDEXING PIPELINE
+// ════════════════════════════════════════════
+async function indexPDF(file) {
+  if (isProcessing) return;
+  isProcessing = true;
+  vectorStore = [];
+  chatHistory = [];
+  updateUI();
+
+  showProgress(true);
+  resetPipelineSteps();
+
+  try {
+    // Step 1: Parse
+    activateStep('chunk');
+    setProgress(5, 'Parsing PDF pages...');
+    const pages = await parsePDF(file);
+
+    // Step 2: Chunk
+    setProgress(30, 'Chunking text...');
+    const chunks = chunkPages(pages);
+    statChunks.textContent = chunks.length;
+    statPages.textContent = totalPages;
+    doneStep('chunk');
+
+    // Step 3: Embed
+    activateStep('embed');
+    setProgress(35, 'Generating embeddings...');
+    const embeddings = await embedTexts(chunks.map(c => c.text));
+    statEmbeds.textContent = embeddings.length;
+    statDim.textContent = embeddings[0]?.length || EMBEDDING_DIM;
+    doneStep('embed');
+
+    // Step 4: Store
+    activateStep('store');
+    setProgress(92, 'Building vector store...');
+    buildVectorStore(chunks, embeddings);
+    doneStep('store');
+
+    setProgress(100, `✅ Indexed ${chunks.length} chunks from ${totalPages} pages`);
+    ragStatus.textContent = `${chunks.length} chunks indexed · ${totalPages} pages`;
+    tokenInfo.textContent = `dim=${embeddings[0]?.length || 1536} · model=text-embedding-3-small`;
+
+    addSystemMsg(`✅ **${file.name}** indexed successfully!\n\n**${chunks.length} chunks** created from **${totalPages} pages**, each embedded with OpenAI \`text-embedding-3-small\` (${embeddings[0]?.length || 1536} dimensions) and stored in memory.\n\nAsk me anything — I'll retrieve the most relevant chunks using cosine similarity, then answer with Claude.`);
+
+    setTimeout(() => showProgress(false), 2000);
+
+  } catch (err) {
+    showError(err.message);
+    showProgress(false);
+    resetPipelineSteps();
+  }
+
+  isProcessing = false;
+  updateUI();
+}
+
+// ════════════════════════════════════════════
+// FULL RAG QUERY PIPELINE
+// ════════════════════════════════════════════
+async function sendMessage() {
+  const q = chatInput.value.trim();
+  if (!q || isProcessing || vectorStore.length === 0) return;
+
+  hideError();
+  addMsg('user', q);
+  chatHistory.push({ role: 'user', content: q });
+  chatInput.value = '';
+  chatInput.style.height = 'auto';
+
+  isProcessing = true;
+  updateUI();
+  const typingEl = addTyping();
+
+  try {
+    // Retrieve
+    activateStep('retrieve');
+    ragStatus.textContent = 'Retrieving chunks...';
+    const retrieved = await retrieveChunks(q);
+    doneStep('retrieve');
+
+    // Show retrieved chunks in sidebar
+    renderRetrievedChunks(retrieved);
+    tokenInfo.textContent = `${retrieved.length} chunks retrieved · top score: ${retrieved[0]?.score.toFixed(3) || '—'}`;
+
+    // Generate
+    activateStep('generate');
+    ragStatus.textContent = 'Generating answer...';
+    const answer = await generateAnswer(q, retrieved);
+    doneStep('generate');
+
+    chatHistory.push({ role: 'assistant', content: answer });
+    typingEl.remove();
+
+    // Show context badge + answer
+    addMsgWithContext('ai', answer, retrieved.length, retrieved[0]?.score);
+    ragStatus.textContent = `${vectorStore.length} chunks indexed`;
+
+  } catch (err) {
+    typingEl.remove();
+    showError(err.message);
+    chatHistory.pop();
+    ragStatus.textContent = `${vectorStore.length} chunks indexed`;
+    resetPipelineSteps();
+  }
+
+  isProcessing = false;
+  updateUI();
+}
+
+// ════════════════════════════════════════════
+// UI HELPERS
+// ════════════════════════════════════════════
+function setProgress(pct, label) {
+  progressFill.style.width = pct + '%';
+  progressLabel.textContent = label;
+}
+
+function showProgress(show) {
+  progressWrap.classList.toggle('show', show);
+}
+
+function activateStep(key) {
+  Object.values(pipeSteps).forEach(el => el.classList.remove('active'));
+  pipeSteps[key]?.classList.add('active');
+}
+
+function doneStep(key) {
+  pipeSteps[key]?.classList.remove('active');
+  pipeSteps[key]?.classList.add('done');
+}
+
+function resetPipelineSteps() {
+  Object.values(pipeSteps).forEach(el => {
+    el.classList.remove('active', 'done');
+  });
+}
+
+function renderRetrievedChunks(chunks) {
+  chunksPanel.innerHTML = chunks.length === 0
+    ? '<div class="empty-chunks">No relevant chunks found above threshold.</div>'
+    : chunks.map(c => `
+        <div class="chunk-item">
+          <div class="chunk-meta">Page ${c.page} · Score: ${c.score.toFixed(4)} · Chunk #${c.chunkId}</div>
+          <div class="chunk-preview">${escapeHtml(c.text)}</div>
+        </div>
+      `).join('');
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function updateUI() {
+  const ready = vectorStore.length > 0 && apiKey.value.trim() && openaiKey.value.trim();
+  chatInput.disabled = !ready || isProcessing;
+  sendBtn.disabled = !ready || isProcessing;
+  if (!ready && vectorStore.length === 0) {
+    chatInput.placeholder = 'Upload a PDF and add API keys to start...';
+  } else if (!apiKey.value.trim() || !openaiKey.value.trim()) {
+    chatInput.placeholder = 'Add both API keys to start chatting...';
+  } else if (isProcessing) {
+    chatInput.placeholder = 'Processing...';
+  } else {
+    chatInput.placeholder = 'Ask a question about your PDF...';
+  }
+}
+
+function addSystemMsg(text) {
+  document.getElementById('welcome')?.remove();
+  const div = document.createElement('div');
+  div.className = 'msg ai';
+  div.innerHTML = `
+    <div class="avatar ai">RAG</div>
+    <div class="msg-content">
+      <div class="bubble">${formatText(text)}</div>
+    </div>`;
+  messagesEl.appendChild(div);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function addMsg(role, text) {
+  document.getElementById('welcome')?.remove();
+  const div = document.createElement('div');
+  div.className = `msg ${role}`;
+  const label = role === 'ai' ? 'RAG' : 'You';
+  div.innerHTML = `
+    <div class="avatar ${role}">${label}</div>
+    <div class="msg-content">
+      <div class="bubble">${formatText(text)}</div>
+    </div>`;
+  messagesEl.appendChild(div);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function addMsgWithContext(role, text, numChunks, topScore) {
+  document.getElementById('welcome')?.remove();
+  const div = document.createElement('div');
+  div.className = `msg ${role}`;
+  div.innerHTML = `
+    <div class="avatar ${role}">RAG</div>
+    <div class="msg-content">
+      <div class="context-badge">🔍 ${numChunks} chunks retrieved · top similarity: ${topScore?.toFixed(4) || '—'}</div>
+      <div class="bubble">${formatText(text)}</div>
+    </div>`;
+  messagesEl.appendChild(div);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function addTyping() {
+  const div = document.createElement('div');
+  div.className = 'msg ai';
+  div.id = 'typing';
+  div.innerHTML = `
+    <div class="avatar ai">RAG</div>
+    <div class="msg-content">
+      <div class="bubble"><div class="typing-dots"><span></span><span></span><span></span></div></div>
+    </div>`;
+  messagesEl.appendChild(div);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+  return div;
+}
+
+function formatText(text) {
+  return text
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\n/g, '<br>');
+}
+
+function showError(msg) {
+  const t = document.getElementById('errorToast');
+  t.textContent = '⚠️ ' + msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 6000);
+}
+function hideError() { document.getElementById('errorToast').classList.remove('show'); }
+
+// ════════════════════════════════════════════
+// EVENTS
+// ════════════════════════════════════════════
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+uploadZone.addEventListener('drop', e => {
+  e.preventDefault(); uploadZone.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file?.type === 'application/pdf') indexPDF(file);
+});
+
+fileInput.addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (file) indexPDF(file);
+});
+
+apiKey.addEventListener('input', updateUI);
+openaiKey.addEventListener('input', updateUI);
+
+chatInput.addEventListener('input', function() {
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+});
+
+chatInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+});
+sendBtn.addEventListener('click', sendMessage);
+
+updateUI();
+</script>
+</body>
+</html>
