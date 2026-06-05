@@ -1,4 +1,5 @@
 import os, uuid, json, asyncio
+os.environ["CHROMA_TELEMETRY_OFF"] = "True"
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
