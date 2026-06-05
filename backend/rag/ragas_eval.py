@@ -7,8 +7,8 @@ async def evaluate_ragas(
     retrieved: list[dict],
     api_key: str,
 ) -> dict:
-    # Use v1beta for RAGAS evaluation as well
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={api_key}"
+    # Use the model alias verified by the user
+    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent"
     
     context = "\n\n---\n\n".join(
         f"[Chunk {i+1} | Page {c['page']} | Similarity: {c['score']:.3f}]\n{c['text']}"
@@ -39,9 +39,15 @@ Return exactly this JSON structure:
         }
     }
 
+    # Using X-goog-api-key header
+    headers = {
+        "Content-Type": "application/json",
+        "X-goog-api-key": api_key
+    }
+
     async with httpx.AsyncClient() as client:
         try:
-            response = await client.post(url, json=payload, timeout=30.0)
+            response = await client.post(url, headers=headers, json=payload, timeout=30.0)
             if response.status_code != 200:
                 raise Exception(f"API Error {response.status_code}: {response.text}")
             

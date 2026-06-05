@@ -8,8 +8,8 @@ async def stream_answer(
     chat_history: list[dict],
     api_key: str,
 ) -> AsyncGenerator[str, None]:
-    # Use v1beta and explicit alt=sse for better streaming compatibility
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:streamGenerateContent?alt=sse&key={api_key}"
+    # Use the model alias verified by the user
+    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:streamGenerateContent?alt=sse"
     
     context = "\n\n---\n\n".join(
         f"[Chunk {i+1} | Page {c['page']} | Similarity: {c['score']:.3f}]\n{c['text']}"
@@ -40,9 +40,15 @@ RETRIEVED CONTEXT:
         }
     }
 
+    # Using X-goog-api-key header as per user's working curl example
+    headers = {
+        "Content-Type": "application/json",
+        "X-goog-api-key": api_key
+    }
+
     async with httpx.AsyncClient() as client:
         try:
-            async with client.stream("POST", url, json=payload, timeout=60.0) as response:
+            async with client.stream("POST", url, headers=headers, json=payload, timeout=60.0) as response:
                 if response.status_code != 200:
                     err_body = await response.aread()
                     yield f"⚠️ API Error {response.status_code}: {err_body.decode()}"
