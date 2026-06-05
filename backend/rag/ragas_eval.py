@@ -7,7 +7,8 @@ async def evaluate_ragas(
     retrieved: list[dict],
     api_key: str,
 ) -> dict:
-    genai.configure(api_key=api_key)
+    # Use 'rest' transport to avoid gRPC issues on some platforms like Render
+    genai.configure(api_key=api_key, transport='rest')
     
     context = "\n\n---\n\n".join(
         f"[Chunk {i+1} | Page {c['page']} | Similarity: {c['score']:.3f}]\n{c['text']}"
@@ -31,13 +32,13 @@ Return exactly this JSON structure:
   "context_recall": {{"score": 0.0, "reason": "one sentence"}}
 }}"""
 
-    # Use 'gemini-1.5-flash-latest' for more robust resolution than the generic alias
+    # 'gemini-1.5-flash' is the stable alias
     model = genai.GenerativeModel(
-        model_name="gemini-1.5-flash-latest",
+        model_name="gemini-1.5-flash",
         generation_config={"response_mime_type": "application/json"}
     )
 
-    # Use the asynchronous method to avoid blocking the FastAPI event loop
+    # Use asynchronous generation
     response = await model.generate_content_async(prompt)
     
     try:

@@ -7,7 +7,8 @@ async def stream_answer(
     chat_history: list[dict],
     api_key: str,
 ) -> AsyncGenerator[str, None]:
-    genai.configure(api_key=api_key)
+    # Use 'rest' transport to avoid gRPC issues on some platforms like Render
+    genai.configure(api_key=api_key, transport='rest')
     
     context = "\n\n---\n\n".join(
         f"[Chunk {i+1} | Page {c['page']} | Similarity: {c['score']:.3f}]\n{c['text']}"
@@ -21,9 +22,9 @@ If the answer is not in the chunks, say so clearly.
 RETRIEVED CONTEXT:
 {context}"""
 
-    # Use 'gemini-1.5-flash-latest' for more robust resolution than the generic alias
+    # 'gemini-1.5-flash' is the stable alias
     model = genai.GenerativeModel(
-        model_name="gemini-1.5-flash-latest",
+        model_name="gemini-1.5-flash",
         system_instruction=system_instruction
     )
 
@@ -35,7 +36,7 @@ RETRIEVED CONTEXT:
 
     chat = model.start_chat(history=history)
     
-    # Use the asynchronous streaming method to avoid blocking the FastAPI event loop
+    # Use asynchronous streaming
     response = await chat.send_message_async(question, stream=True)
     
     async for chunk in response:
